@@ -6,25 +6,67 @@ const Application = require('../models/Application');
 
 const getApplications = async (req, res, next) => {
 
-    try {
+   try {
 
-        if (req.query.status) {
-            
-            const applications = await Application.find({ status: req.query.status });
-            res.json(applications);
-        } else {
-             const applications = await Application.find();
-            res.json(applications);
-        }
+    const page = Number(req.query.page);
+    const limit = Number(req.query.limit);
 
 
+    if (page.isInteger)
 
-    } catch (error) {
+    const filter = {};
+    
+    const allowedSortFields = ["company", "jobTitle", "status", "dateApplied"];
 
-        next(error)
+    if (req.query.status) {
+        filter.status = req.query.status;
     }
 
-};
+    let sortField = req.query.sort || 'dateApplied'; 
+    let sortOrder = 1; 
+
+   
+    if (sortField.startsWith('-')) {
+        sortOrder = -1;
+        sortField = sortField.substring(1); 
+    }
+
+    if (!allowedSortFields.includes(sortField)) {
+        sortField = 'dateApplied';
+        sortOrder = 1;
+    }
+
+   let page = req.query.page === undefined ? 1 : Number(req.query.page);
+
+    if (!Number.isInteger(page) || page <1){
+
+        return res.status(400).json({
+            "message": "invalid page"
+        })
+    }   
+
+
+
+    
+    let limit = req.query.limit === undefined ? 5 : Number(req.query.limit)
+
+    if (!Number.isInteger(limit) || limit > 1 || limit < 100){
+         return res.status(400).json({
+            "message": "invalid limit"
+        })
+    }
+    const skip = (page-1)*limit
+
+    
+    const applications = await Application.find(filter)
+        .sort({ [sortField]: sortOrder }).skip(skip); 
+
+    res.json(applications);
+
+} catch (error) {
+    next(error);
+}
+}
 
 
 const getApplicationById = async (req, res, next) => {
@@ -92,7 +134,7 @@ const updateApplication = async (req, res, next) => {
             })
         }
 
-        
+
         const application = await Application.findByIdAndUpdate(
             id,
             req.body,
@@ -102,9 +144,9 @@ const updateApplication = async (req, res, next) => {
                 runValidators: true,
             }
         );
-        
+
         res.json(application);
-        
+
         if (!application1) {
             return next(new ApplicationError("Application not found", 404))
         }
@@ -129,10 +171,10 @@ const deleteApplication = async (req, res, next) => {
     }
 
     try {
-        
+
         const application = await Application.findByIdAndDelete(id);
         res.json(application)
-        
+
         if (!application1) {
             return new ApplicationError("Application not found", 404)
         }
